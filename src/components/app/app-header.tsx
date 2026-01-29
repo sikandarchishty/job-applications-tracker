@@ -47,11 +47,9 @@ export function AppHeader({ user, onSignIn, onSignOut }: AppHeaderProps) {
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="md:w-full gap-2">
                                     <Avatar className="h-7 w-7">
-                                        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-                                        {/* @ts-expect-error - avatar is stored in custom prefs */}
-                                        {user.prefs?.avatar && (
+                                        {(user.prefs as Record<string, unknown>)?.avatar && (
                                             <AvatarImage
-                                                src={user.prefs.avatar}
+                                                src={(user.prefs as Record<string, unknown>).avatar as string}
                                                 alt={user.name || "User"}
                                             />
                                         )}
