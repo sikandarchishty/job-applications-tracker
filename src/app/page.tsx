@@ -31,6 +31,7 @@ import {
 } from "@/lib/appwrite";
 import { jobStatuses, sampleJobs, type Job, type JobInput, type JobStatus } from "@/lib/jobs";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoaderCircle, PlusIcon } from "lucide-react";
 
 const statusFilters = ["All", ...jobStatuses] as const;
 type StatusFilter = (typeof statusFilters)[number];
@@ -234,10 +235,8 @@ export default function Home() {
 
   if (loadingUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-        <div className="rounded-2xl border border-border bg-background p-8 text-center">
-          <p className="text-sm text-muted-foreground">Please wait while the app loads...</p>
-        </div>
+      <div className="flex flex-col gap-3 min-h-screen items-center justify-center px-4">
+        <p className="text-sm text-muted-foreground"><LoaderCircle className="w-8 h-8 animate-spin" /></p>
       </div>
     );
   }
@@ -369,13 +368,13 @@ export default function Home() {
       </main>
 
       {/* Floating Add Job Button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-10 right-6 md:bottom-6 md:right-6 z-50">
         <JobFormDialog
           onCreate={handleCreateJob}
           trigger={
-            <Button size="lg" className="h-14 w-14 rounded-full shadow-lg">
-              <span className="text-2xl">+</span>
-            </Button>
+            <div className="bg-card-foreground flex items-center justify-center h-16 w-16 rounded-full shadow-lg cursor-pointer" role="button">
+              <PlusIcon className="w-10 h-10 text-background" />
+            </div>
           }
         />
       </div>
