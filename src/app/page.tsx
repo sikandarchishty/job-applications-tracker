@@ -1,65 +1,392 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { AppHeader } from "@/components/app/app-header";
+import { JobCard } from "@/components/app/job-card";
+import { JobFormDialog } from "@/components/app/job-form-dialog";
+import { StatsBar } from "@/components/app/stats-bar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Models } from "appwrite";
+import {
+  appwriteConfig,
+  createJob,
+  deleteJob,
+  getCurrentUser,
+  getCurrentSession,
+  fetchGoogleUserData,
+  listJobs,
+  signInWithGoogle,
+  signOut,
+  updateJob,
+  updateUserAvatar,
+} from "@/lib/appwrite";
+import { jobStatuses, sampleJobs, type Job, type JobInput, type JobStatus } from "@/lib/jobs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const statusFilters = ["All", ...jobStatuses] as const;
+type StatusFilter = (typeof statusFilters)[number];
+
+const getLocalId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `job-${Date.now()}`;
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message ?? fallback);
+  }
+  if (typeof error === "string") return error;
+  return fallback;
+};
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
+  const [jobs, setJobs] = useState<Job[]>(sampleJobs);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [workTypeFilter, setWorkTypeFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  const hasAppwrite = Boolean(appwriteConfig.endpoint && appwriteConfig.projectId);
+  const hasDatabase = Boolean(
+    appwriteConfig.databaseId && appwriteConfig.jobsCollectionId
+  );
+  const syncEnabled = Boolean(hasAppwrite && hasDatabase && user);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCurrentUser()
+      .then((currentUser) => {
+        if (isMounted) setUser(currentUser);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingUser(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!syncEnabled) return;
+
+    listJobs()
+      .then((data) => setJobs(data))
+  }, [syncEnabled]);
+
+  // Fetch and update user preferences with Google data after login
+  useEffect(() => {
+    if (!user || (user.prefs as Record<string, unknown>)?.avatar) return;
+
+    const updatePreferences = async () => {
+      try {
+        const currentSession = await getCurrentSession();
+
+        if (currentSession && currentSession.providerAccessToken) {
+          const googleData = await fetchGoogleUserData(currentSession.providerAccessToken);
+
+          if (googleData && googleData.picture) {
+            const updatedUser = await updateUserAvatar(googleData.picture);
+            if (updatedUser) {
+              setUser(updatedUser);
+            }
+          }
+        }
+      } catch (error) {
+        // Silent fail
+      }
+    };
+
+    updatePreferences();
+  }, [user]);
+
+  const filteredJobs = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return jobs.filter((job) => {
+      const matchesQuery =
+        !query ||
+        [job.company, job.role, job.workType, job.notes]
+          .filter(Boolean)
+          .some((value) => value?.toLowerCase().includes(query));
+      const matchesStatus =
+        statusFilter === "All" || job.status === statusFilter;
+      const matchesWorkType =
+        workTypeFilter === "all" || job.workType === workTypeFilter;
+      return matchesQuery && matchesStatus && matchesWorkType;
+    });
+  }, [jobs, search, statusFilter, workTypeFilter]);
+
+  const JOBS_PER_PAGE = 20;
+  const totalPages = Math.ceil(filteredJobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (currentPage - 1) * JOBS_PER_PAGE;
+    const endIndex = startIndex + JOBS_PER_PAGE;
+    return filteredJobs.slice(startIndex, endIndex);
+  }, [filteredJobs, currentPage]);
+
+  const workTypes = useMemo(() => {
+    return ["Remote", "Hybrid", "On-site"];
+  }, []);
+
+  const handleCreateJob = async (job: JobInput) => {
+    setAppError(null);
+    if (syncEnabled) {
+      try {
+        const created = await createJob(job);
+        setJobs((prev) => [created, ...prev]);
+        toast.success(`Job application added: ${created.company}`);
+        return;
+      } catch (error) {
+        setAppError(
+          `Unable to create job in Appwrite. ${getErrorMessage(
+            error,
+            "Please check collection permissions and required fields."
+          )}`
+        );
+        return;
+      }
+    }
+    setJobs((prev) => [{ ...job, id: getLocalId() }, ...prev]);
+    toast.success(`Job application added: ${job.company}`);
+  };
+
+  const handleStatusChange = async (id: string, status: JobStatus) => {
+    setAppError(null);
+    // Get the job title for the toast
+    const job = jobs.find((j) => j.id === id);
+    if (syncEnabled) {
+      try {
+        const updated = await updateJob(id, { status, lastContacted: new Date().toISOString().slice(0, 10) });
+        setJobs((prev) => prev.map((job) => (job.id === id ? updated : job)));
+        toast.success(`Status updated to ${status}`);
+        return;
+      } catch {
+        setAppError("Unable to update job in Appwrite.");
+      }
+    }
+
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === id
+          ? { ...job, status, lastContacted: new Date().toISOString().slice(0, 10) }
+          : job
+      )
+    );
+    toast.success(`Status updated to ${status}`);
+  };
+
+  const handleEditJob = async (id: string, updates: JobInput) => {
+    setAppError(null);
+    if (syncEnabled) {
+      try {
+        const updated = await updateJob(id, updates);
+        setJobs((prev) => prev.map((job) => (job.id === id ? updated : job)));
+        toast.success(`Job application updated: ${updated.company}`);
+        return;
+      } catch (error) {
+        setAppError(
+          `Unable to update job in Appwrite. ${getErrorMessage(
+            error,
+            "Please check that all required fields are filled."
+          )}`
+        );
+      }
+    }
+
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === id
+          ? { ...job, ...updates }
+          : job
+      )
+    );
+    toast.success(`Job application updated: ${updates.company}`);
+  };
+
+  const handleDeleteJob = async (id: string) => {
+    setAppError(null);
+    const job = jobs.find((j) => j.id === id);
+    if (syncEnabled) {
+      try {
+        await deleteJob(id);
+        setJobs((prev) => prev.filter((job) => job.id !== id));
+        toast.success(`Job application deleted: ${job?.company}`);
+        return;
+      } catch {
+        setAppError("Unable to delete job from Appwrite.");
+      }
+    }
+    setJobs((prev) => prev.filter((job) => job.id !== id));
+    toast.success(`Job application deleted: ${job?.company}`);
+  };
+
+  const handleSignIn = () => {
+    setAppError(null);
+    signInWithGoogle().catch(() =>
+      setAppError("Google sign-in is not available yet.")
+    );
+  };
+
+  const handleSignOut = () => {
+    setAppError(null);
+    signOut().finally(() => setUser(null));
+  };
+
+  if (loadingUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+        <div className="rounded-2xl border border-border bg-background p-8 text-center">
+          <p className="text-sm text-muted-foreground">Please wait while the app loads...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+        <div className="w-full max-w-lg rounded-3xl border border-border bg-background p-8 text-center">
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+            Job Applications Tracker
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-3 text-sm text-muted-foreground">
+            Sign in to manage your job applications, track status updates, and more.
           </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <Button onClick={handleSignIn} disabled={!hasAppwrite}>
+              Sign in with Google
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      <AppHeader user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-8">
+
+        <StatsBar jobs={jobs} />
+
+        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-background p-5">
+          <h2 className="text-lg font-semibold">Filter Jobs</h2>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
+              <Input
+                placeholder="Search by company, role, or notes"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full md:max-w-sm"
+              />
+              <Select
+                value={workTypeFilter}
+                onValueChange={(value) => setWorkTypeFilter(value)}
+              >
+                <SelectTrigger className="w-full md:w-50">
+                  <SelectValue placeholder="Filter by work type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All work types</SelectItem>
+                  {workTypes.map((workType) => (
+                    <SelectItem key={workType} value={workType}>
+                      {workType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex w-full items-center gap-2 lg:w-auto">
+              <Button variant="outline" className="w-full lg:w-auto" onClick={() => {
+                setSearch("");
+                setStatusFilter("All");
+                setWorkTypeFilter("all");
+              }}>
+                Reset filters
+              </Button>
+            </div>
+          </div>
+          <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
+            <TabsList className="flex w-full flex-wrap">
+              {statusFilters.map((status) => (
+                <TabsTrigger key={status} value={status}>
+                  {status}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredJobs.length} {filteredJobs.length === 1 ? "job" : "jobs"} found
+              {totalPages > 1 && ` (page ${currentPage} of ${totalPages})`}
+            </div>
+          </div>
         </div>
+
+        {filteredJobs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border bg-muted/40 p-12 text-center">
+            <p className="text-sm text-muted-foreground">No jobs match your filters.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4">
+              {paginatedJobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onStatusChange={handleStatusChange}
+                  onEdit={handleEditJob}
+                  onDelete={handleDeleteJob}
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </main>
+
+      {/* Floating Add Job Button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <JobFormDialog
+          onCreate={handleCreateJob}
+          trigger={
+            <Button size="lg" className="h-14 w-14 rounded-full shadow-lg">
+              <span className="text-2xl">+</span>
+            </Button>
+          }
+        />
+      </div>
     </div>
   );
 }
