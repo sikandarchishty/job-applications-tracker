@@ -26,7 +26,7 @@ export function StatsBar({ jobs }: StatsBarProps) {
 
     return (
         <div className="w-full overflow-x-auto">
-            <div className="flex gap-3 min-w-max h-[100px]">
+            <div className="flex gap-3 min-w-max h-25">
                 {stats.map((stat) => (
                     <Card key={stat.label} className={`flex-1 min-w-40 sm:max-w-40 md:max-w-full border-0 ${stat.bgColor}`}>
                         <CardContent className="flex h-full flex-col gap-1 p-4 justify-center">

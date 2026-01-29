@@ -100,7 +100,7 @@ export default function Home() {
             }
           }
         }
-      } catch (error) {
+      } catch {
         // Silent fail
       }
     };
@@ -158,8 +158,6 @@ export default function Home() {
   };
 
   const handleStatusChange = async (id: string, status: JobStatus) => {
-    // Get the job title for the toast
-    const job = jobs.find((j) => j.id === id);
     if (syncEnabled) {
       try {
         const updated = await updateJob(id, { status, lastContacted: new Date().toISOString().slice(0, 10) });
