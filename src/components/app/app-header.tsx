@@ -47,7 +47,7 @@ export function AppHeader({ user, onSignIn, onSignOut }: AppHeaderProps) {
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="md:w-full gap-2">
                                     <Avatar className="h-7 w-7">
-                                        {(user.prefs as Record<string, unknown>)?.avatar && (
+                                        {Boolean((user.prefs as Record<string, unknown>)?.avatar) && (
                                             <AvatarImage
                                                 src={(user.prefs as Record<string, unknown>).avatar as string}
                                                 alt={user.name || "User"}
