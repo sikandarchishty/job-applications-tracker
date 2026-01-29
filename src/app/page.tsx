@@ -137,7 +137,6 @@ export default function Home() {
   }, []);
 
   const handleCreateJob = async (job: JobInput) => {
-    setAppError(null);
     if (syncEnabled) {
       try {
         const created = await createJob(job);
@@ -145,7 +144,7 @@ export default function Home() {
         toast.success(`Job application added: ${created.company}`);
         return;
       } catch (error) {
-        setAppError(
+        toast.error(
           `Unable to create job in Appwrite. ${getErrorMessage(
             error,
             "Please check collection permissions and required fields."
@@ -159,7 +158,6 @@ export default function Home() {
   };
 
   const handleStatusChange = async (id: string, status: JobStatus) => {
-    setAppError(null);
     // Get the job title for the toast
     const job = jobs.find((j) => j.id === id);
     if (syncEnabled) {
@@ -169,7 +167,7 @@ export default function Home() {
         toast.success(`Status updated to ${status}`);
         return;
       } catch {
-        setAppError("Unable to update job in Appwrite.");
+        toast.error("Unable to update job in Appwrite.");
       }
     }
 
@@ -184,7 +182,6 @@ export default function Home() {
   };
 
   const handleEditJob = async (id: string, updates: JobInput) => {
-    setAppError(null);
     if (syncEnabled) {
       try {
         const updated = await updateJob(id, updates);
@@ -192,7 +189,7 @@ export default function Home() {
         toast.success(`Job application updated: ${updated.company}`);
         return;
       } catch (error) {
-        setAppError(
+        toast.error(
           `Unable to update job in Appwrite. ${getErrorMessage(
             error,
             "Please check that all required fields are filled."
@@ -212,7 +209,6 @@ export default function Home() {
   };
 
   const handleDeleteJob = async (id: string) => {
-    setAppError(null);
     const job = jobs.find((j) => j.id === id);
     if (syncEnabled) {
       try {
@@ -221,7 +217,7 @@ export default function Home() {
         toast.success(`Job application deleted: ${job?.company}`);
         return;
       } catch {
-        setAppError("Unable to delete job from Appwrite.");
+        toast.error("Unable to delete job from Appwrite.");
       }
     }
     setJobs((prev) => prev.filter((job) => job.id !== id));
@@ -229,14 +225,12 @@ export default function Home() {
   };
 
   const handleSignIn = () => {
-    setAppError(null);
     signInWithGoogle().catch(() =>
-      setAppError("Google sign-in is not available yet.")
+      toast.error("Google sign-in is not available yet.")
     );
   };
 
   const handleSignOut = () => {
-    setAppError(null);
     signOut().finally(() => setUser(null));
   };
 
