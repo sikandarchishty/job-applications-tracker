@@ -50,18 +50,20 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export default function Home() {
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
-  const [jobs, setJobs] = useState<Job[]>(sampleJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [workTypeFilter, setWorkTypeFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [loadingJobs, setLoadingJobs] = useState(true);
 
   const hasAppwrite = Boolean(appwriteConfig.endpoint && appwriteConfig.projectId);
   const hasDatabase = Boolean(
     appwriteConfig.databaseId && appwriteConfig.jobsCollectionId
   );
   const syncEnabled = Boolean(hasAppwrite && hasDatabase && user);
+  const isJobsLoading = syncEnabled && loadingJobs;
 
   useEffect(() => {
     let isMounted = true;
@@ -79,10 +81,20 @@ export default function Home() {
 
   useEffect(() => {
     if (!syncEnabled) return;
+    setLoadingJobs(true);
 
     listJobs()
       .then((data) => setJobs(data))
+      .finally(() => setLoadingJobs(false));
   }, [syncEnabled]);
+
+  useEffect(() => {
+    if (loadingUser) return;
+    if (!syncEnabled) {
+      setJobs(sampleJobs);
+      setLoadingJobs(false);
+    }
+  }, [loadingUser, syncEnabled]);
 
   // Fetch and update user preferences with Google data after login
   useEffect(() => {
@@ -133,7 +145,7 @@ export default function Home() {
       return matchesQuery && matchesStatus && matchesWorkType;
     });
 
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const orderA = statusOrder[a.status] || 999;
       const orderB = statusOrder[b.status] || 999;
       return orderA - orderB;
@@ -352,7 +364,12 @@ export default function Home() {
         </Accordion>
         {/* </div> */}
 
-        {filteredJobs.length === 0 ? (
+        {isJobsLoading ? (
+          <div className="rounded-2xl border border-border bg-background p-12 text-center">
+            <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="mt-3 text-sm text-muted-foreground">Loading jobs...</p>
+          </div>
+        ) : filteredJobs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/40 p-12 text-center">
             <p className="text-sm text-muted-foreground">No jobs match your filters.</p>
           </div>

@@ -167,8 +167,7 @@ async function getUserPermissions() {
 }
 
 function toAppwritePayload(input: JobInput) {
-    const { lastContacted, ...rest } = input;
-    return rest;
+    return input;
 }
 
 export async function listJobs(): Promise<Job[]> {
@@ -218,7 +217,7 @@ export async function createJob(input: JobInput): Promise<Job> {
         link: response.link ?? undefined,
         notes: response.notes ?? undefined,
         contact: response.contact ?? undefined,
-        lastUpdate: response.lastUpdate ?? undefined,
+        lastContacted: response.lastContacted ?? undefined,
     } as Job;
 }
 
@@ -227,8 +226,8 @@ export async function updateJob(
     updates: Partial<JobInput>
 ): Promise<Job> {
     const appwrite = ensureDatabase();
-    // Remove id, undefined values, and lastContacted
-    const { id: _, lastContacted, ...rest } = updates as any;
+    // Remove id and undefined values
+    const { id: _, ...rest } = updates as any;
     const payload = Object.fromEntries(
         Object.entries(rest).filter(([, value]) => value !== undefined)
     );
@@ -252,7 +251,7 @@ export async function updateJob(
         link: response.link ?? undefined,
         notes: response.notes ?? undefined,
         contact: response.contact ?? undefined,
-        lastUpdate: response.lastUpdate ?? undefined,
+        lastContacted: response.lastContacted ?? undefined,
     } as Job;
 }
 

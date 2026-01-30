@@ -35,6 +35,7 @@ const defaultJob: JobInput = {
     link: "",
     notes: "",
     contact: "",
+    lastContacted: "",
 };
 
 type JobFormDialogProps = {
@@ -211,7 +212,7 @@ export function JobFormDialog({
                                     <Input
                                         id="appliedDate"
                                         type="date"
-                                        value={form.appliedDate}
+                                        value={form.appliedDate || ""}
                                         onChange={(event) =>
                                             handleChange("appliedDate", event.target.value)
                                         }
@@ -222,7 +223,7 @@ export function JobFormDialog({
                                     <Input
                                         id="lastContacted"
                                         type="date"
-                                        value={form.lastContacted}
+                                        value={form.lastContacted || ""}
                                         onChange={(event) =>
                                             handleChange("lastContacted", event.target.value)
                                         }
