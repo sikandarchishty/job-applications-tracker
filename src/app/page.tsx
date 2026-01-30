@@ -31,7 +31,8 @@ import {
 } from "@/lib/appwrite";
 import { jobStatuses, sampleJobs, type Job, type JobInput, type JobStatus } from "@/lib/jobs";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LoaderCircle, PlusIcon } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Filter, LoaderCircle, PlusIcon } from "lucide-react";
 
 const statusFilters = ["All", ...jobStatuses] as const;
 type StatusFilter = (typeof statusFilters)[number];
@@ -111,7 +112,15 @@ export default function Home() {
 
   const filteredJobs = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return jobs.filter((job) => {
+    const statusOrder: Record<JobStatus, number> = {
+      "Short listed": 1,
+      "Interviewing": 2,
+      "Offer": 3,
+      "Applied": 4,
+      "Rejected": 5,
+    };
+
+    const filtered = jobs.filter((job) => {
       const matchesQuery =
         !query ||
         [job.company, job.role, job.workType, job.notes]
@@ -122,6 +131,12 @@ export default function Home() {
       const matchesWorkType =
         workTypeFilter === "all" || job.workType === workTypeFilter;
       return matchesQuery && matchesStatus && matchesWorkType;
+    });
+
+    return filtered.sort((a, b) => {
+      const orderA = statusOrder[a.status] || 999;
+      const orderB = statusOrder[b.status] || 999;
+      return orderA - orderB;
     });
   }, [jobs, search, statusFilter, workTypeFilter]);
 
@@ -264,63 +279,78 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-muted/30">
       <AppHeader user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-8">
+      <main className="mx-auto flex w-full max-w-6xl flex-col px-4 py-8 md:px-8">
 
         <StatsBar jobs={jobs} />
 
-        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-background p-5">
-          <h2 className="text-lg font-semibold">Filter Jobs</h2>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
-              <Input
-                placeholder="Search by company, role, or notes"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="w-full md:max-w-sm"
-              />
-              <Select
-                value={workTypeFilter}
-                onValueChange={(value) => setWorkTypeFilter(value)}
-              >
-                <SelectTrigger className="w-full md:w-50">
-                  <SelectValue placeholder="Filter by work type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All work types</SelectItem>
-                  {workTypes.map((workType) => (
-                    <SelectItem key={workType} value={workType}>
-                      {workType}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="filters" className="border-none">
+            <div className="flex items-center justify-end">
+              <AccordionTrigger className="flex items-center gap-0 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                <div className="flex items-center gap-2 rounded-md px-3 py-2 text-sm">
+                  <Filter className="h-3.5 w-3.5" />
+                  <span>Filters</span>
+                </div>
+              </AccordionTrigger>
             </div>
-            <div className="flex w-full items-center gap-2 lg:w-auto">
-              <Button variant="outline" className="w-full lg:w-auto" onClick={() => {
-                setSearch("");
-                setStatusFilter("All");
-                setWorkTypeFilter("all");
-              }}>
-                Reset filters
-              </Button>
-            </div>
-          </div>
-          <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-            <TabsList className="flex w-full flex-wrap">
-              {statusFilters.map((status) => (
-                <TabsTrigger key={status} value={status}>
-                  {status}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              {filteredJobs.length} {filteredJobs.length === 1 ? "job" : "jobs"} found
-              {totalPages > 1 && ` (page ${currentPage} of ${totalPages})`}
-            </div>
-          </div>
-        </div>
+            <AccordionContent>
+              <div className="rounded-2xl flex flex-col gap-4 border border-border bg-background px-4 py-5">
+                <h2 className="text-lg font-semibold">Filter Jobs</h2>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
+                    <Input
+                      placeholder="Search by company, role, or notes"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      className="w-full md:max-w-sm"
+                    />
+                    <Select
+                      value={workTypeFilter}
+                      onValueChange={(value) => setWorkTypeFilter(value)}
+                    >
+                      <SelectTrigger className="w-full md:w-50">
+                        <SelectValue placeholder="Filter by work type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All work types</SelectItem>
+                        {workTypes.map((workType) => (
+                          <SelectItem key={workType} value={workType}>
+                            {workType}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex w-full items-center gap-2 lg:w-auto">
+                    <Button variant="outline" className="w-full lg:w-auto" onClick={() => {
+                      setSearch("");
+                      setStatusFilter("All");
+                      setWorkTypeFilter("all");
+                    }}>
+                      Reset filters
+                    </Button>
+                  </div>
+                </div>
+                <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
+                  <TabsList className="flex w-full flex-wrap">
+                    {statusFilters.map((status) => (
+                      <TabsTrigger key={status} value={status}>
+                        {status}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+            </AccordionContent>
+            {/* <div className="flex items-center justify-between px-5 pb-5">
+              <div className="text-sm text-muted-foreground">
+                {filteredJobs.length} {filteredJobs.length === 1 ? "job" : "jobs"} found
+                {totalPages > 1 && ` (page ${currentPage} of ${totalPages})`}
+              </div>
+            </div> */}
+          </AccordionItem>
+        </Accordion>
+        {/* </div> */}
 
         {filteredJobs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/40 p-12 text-center">
@@ -341,7 +371,7 @@ export default function Home() {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 mt-6">
                 <Button
                   variant="outline"
                   size="sm"
