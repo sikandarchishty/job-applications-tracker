@@ -399,7 +399,7 @@ export default function Home() {
       {/* Floating Back to Top Button - Mobile Only */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className="md:hidden fixed bottom-10 left-6 z-50 bg-muted border flex items-center justify-center h-12 w-12 rounded-full shadow-lg"
+        className="md:hidden fixed bottom-8 left-6 z-50 bg-muted border flex items-center justify-center h-12 w-12 rounded-full shadow-lg"
         aria-label="Back to top"
       >
         <ArrowUp className="w-5 h-5 text-foreground" />
