@@ -32,7 +32,7 @@ import {
 import { jobStatuses, sampleJobs, type Job, type JobInput, type JobStatus } from "@/lib/jobs";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Filter, LoaderCircle, PlusIcon } from "lucide-react";
+import { ArrowUp, Filter, LoaderCircle, PlusIcon } from "lucide-react";
 
 const statusFilters = ["All", ...jobStatuses] as const;
 type StatusFilter = (typeof statusFilters)[number];
@@ -396,6 +396,15 @@ export default function Home() {
           </>
         )}
       </main>
+      {/* Floating Back to Top Button - Mobile Only */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className="md:hidden fixed bottom-10 left-6 z-50 bg-muted border flex items-center justify-center h-10 w-10 rounded-full shadow-lg"
+        aria-label="Back to top"
+      >
+        <ArrowUp className="w-4 h-4 text-foreground" />
+      </button>
+
 
       {/* Floating Add Job Button */}
       <div className="fixed bottom-6 right-6 md:bottom-6 md:right-6 z-50">
